@@ -1,0 +1,7 @@
+flask
+pandas
+llama-index
+openai
+pyPDF2
+llama-index-embeddings-huggingface
+sentence-transformers
