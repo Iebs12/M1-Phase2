@@ -16,7 +16,7 @@ def display_and_download_excel(file_path):
     df = pd.read_excel(file_path)
     # Display only the specified columns
     # st.write("## First 10 rows of the updated file:")
-    st.dataframe(df[['Title', 'Relevancy predicted', 'Comments made']].head(10))
+    st.dataframe(df[['Title', 'Relevancy predicted', 'Comments made']].head(11))
 
 def main():
     st.set_page_config(page_title="Relevancy Predictor", layout="wide")

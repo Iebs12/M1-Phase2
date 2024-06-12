@@ -1,6 +1,5 @@
 from flask import Flask, request , jsonify
 import requests
-from bs4 import BeautifulSoup
 from openpyxl import load_workbook
 import os
 import pandas as pd
@@ -8,6 +7,7 @@ import qdrant_client
 from dotenv import load_dotenv
 import nest_asyncio
 from llama_parse import LlamaParse
+from llama_index.llms.groq import Groq
 from llama_index.core import VectorStoreIndex, get_response_synthesizer
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.retrievers import VectorIndexRetriever
@@ -24,6 +24,7 @@ from llama_index.core import get_response_synthesizer
 from llama_index.core.response_synthesizers import BaseSynthesizer
 from llama_index.llms.openai import OpenAI
 from llama_index.core import PromptTemplate
+from llama_index.embeddings.huggingface import HuggingFaceInferenceAPIEmbedding
 
 app = Flask(__name__)
 
@@ -123,9 +124,16 @@ def backend(dict, user_query):
     client = qdrant_client.QdrantClient(location=":memory:")
     vector_store = QdrantVectorStore(client=client, collection_name="test_store")
 
+    #hf_token = "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"
+
+    #headers = {"Authorization": f"Bearer {hf_token}"}
+
+    #embed_model = HuggingFaceInferenceAPIEmbedding(model_name = 'BAAI/bge-base-en-v1.5', headers = headers)
+
     pipeline = IngestionPipeline(
         transformations=[
             SentenceSplitter(chunk_size=128, chunk_overlap=5),
+            #embed_model,
             OpenAIEmbedding(),
         ],
         vector_store=vector_store,
@@ -149,28 +157,17 @@ def backend(dict, user_query):
             nodes = self.retriever.retrieve(query_str)
 
             context_str = "\n\n".join([n.node.get_content() for n in nodes])
-            #print(context_str)
-            #print('--'*50)
+            print(context_str + '\n')
+            print('--'*50)
             response = self.llm.complete(
                 qa_prompt.format(context_str=context_str, query_str=query_str)
             )
 
             return str(response)
 
-    # configure retriever
-    retriever1 = VectorIndexRetriever(
-        index=index,
-        similarity_top_k=5,
-    )
-
-    # configure response synthesizer
-    response_synthesizer1 = get_response_synthesizer(
-        response_mode="tree_summarize",
-        # streaming= True,
-    )
 
     qa_prompt = PromptTemplate(
-        "You are an AI assistant that predicts relevancy of a 'Document' with a certain 'Statement'. If it's a little relevant then return output as '1R1', otherwise '0R0'. If output is '1R1', then state the 'Reason'  which makes it relevant with the help of information present in 'Document'. \n"
+        "You are an AI assistant that predicts relevancy of a 'Document' with a certain 'Statement'. If it is Relevant then return output as '1R1', otherwise '0R0'. If output is '1R1', then state the 'Reason'  which makes it relevant with the help of information present in 'Document'. \n"
        "For example 1:\n"
              
        "Document:" + ''' title: Composition, application of the composition, cosmetic preparation hydrogel bio-mask in the form of a compress, method of manufacturing the preparation
@@ -206,7 +203,21 @@ def backend(dict, user_query):
         "Reason: "
     )
 
+    # configure retriever
+    retriever1 = VectorIndexRetriever(
+        index=index,
+        similarity_top_k=5,
+        #embed_model = embed_model
+    )
+
+    # configure response synthesizer
+    response_synthesizer1 = get_response_synthesizer(
+        response_mode="tree_summarize",
+        # streaming= True,
+    )
+
     llm = OpenAI(model="gpt-3.5-turbo")
+    #llm = Groq(model="mixtral-8x7b-32768")
 
     query_engine = RAGStringQueryEngine(
         retriever=retriever1,
